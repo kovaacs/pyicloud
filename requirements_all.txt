@@ -1,3 +1,4 @@
 -r requirements.txt
 -r requirements_test.txt
+-r requirements_security_key.txt
 tox==4.26.0
