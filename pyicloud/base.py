@@ -473,7 +473,7 @@ class PyiCloudService(object):
 
     @property
     def security_key_names(self) -> Optional[List[str]]:
-        """Security key names that can be ued for the WebAuthn assertion."""
+        """Security key names which can be used for the WebAuthn assertion."""
         return self._get_webauthn_options().get("keyNames")
 
     def _submit_webauthn_assertion_response(self, data: Dict):
