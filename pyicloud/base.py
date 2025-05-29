@@ -247,13 +247,7 @@ class PyiCloudService(object):
             self._authenticate_with_token()
         except (PyiCloudFailedLoginException, PyiCloud2FARequiredException):
             headers: dict[str, str] = self._get_auth_headers()
-            if self.session.data.get("scnt"):
-                headers["scnt"] = self.session.data.get("scnt", "")
 
-            if self.session.data.get("session_id"):
-                headers["X-Apple-ID-Session-Id"] = self.session.data.get(
-                    "session_id", ""
-                )
             self._srp_authentication(headers)
             self._authenticate_with_token()
 
@@ -399,8 +393,16 @@ class PyiCloudService(object):
             "X-Apple-OAuth-State": self._client_id,
             "X-Apple-Widget-Key": "d39ba9916b7251055b22c7f910e2ea796ee65e98b2ddecea8f5dde8d9d1a815d",
         }
+
+        if self.session.data.get("scnt"):
+            headers["scnt"] = self.session.data["scnt"]
+
+        if self.session.data.get("session_id"):
+            headers["X-Apple-ID-Session-Id"] = self.session.data["session_id"]
+
         if overrides:
             headers.update(overrides)
+
         return headers
 
     @property
@@ -463,12 +465,6 @@ class PyiCloudService(object):
         """Retrieve WebAuthn request options (PublicKeyCredentialRequestOptions) for assertion."""
         headers = self._get_auth_headers({"Accept": CONTENT_TYPE_JSON})
 
-        if self.session.data.get("scnt"):
-            headers["scnt"] = self.session.data["scnt"]
-
-        if self.session.data.get("session_id"):
-            headers["X-Apple-ID-Session-Id"] = self.session.data["session_id"]
-
         return self.session.get(self.auth_endpoint, headers=headers).json()
 
     @property
@@ -479,12 +475,6 @@ class PyiCloudService(object):
     def _submit_webauthn_assertion_response(self, data: Dict):
         """Submit the WebAuthn assertion response for authentication."""
         headers = self._get_auth_headers({"Accept": CONTENT_TYPE_JSON})
-
-        if self.session.data.get("scnt"):
-            headers["scnt"] = self.session.data["scnt"]
-
-        if self.session.data.get("session_id"):
-            headers["X-Apple-ID-Session-Id"] = self.session.data["session_id"]
 
         self.session.post(
             f"{self.auth_endpoint}/verify/security/key", json=data, headers=headers
@@ -556,12 +546,6 @@ class PyiCloudService(object):
 
         headers: dict[str, Any] = self._get_auth_headers({"Accept": CONTENT_TYPE_JSON})
 
-        if self.session.data.get("scnt"):
-            headers["scnt"] = self.session.data.get("scnt")
-
-        if self.session.data.get("session_id"):
-            headers["X-Apple-ID-Session-Id"] = self.session.data.get("session_id")
-
         try:
             self.session.post(
                 f"{self.auth_endpoint}/verify/trusteddevice/securitycode",
@@ -581,12 +565,6 @@ class PyiCloudService(object):
     def trust_session(self) -> bool:
         """Request session trust to avoid user log in going forward."""
         headers: dict[str, Any] = self._get_auth_headers()
-
-        if self.session.data.get("scnt"):
-            headers["scnt"] = self.session.data.get("scnt")
-
-        if self.session.data.get("session_id"):
-            headers["X-Apple-ID-Session-Id"] = self.session.data.get("session_id")
 
         try:
             self.session.get(
