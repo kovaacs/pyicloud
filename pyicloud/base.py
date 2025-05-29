@@ -462,16 +462,28 @@ class PyiCloudService(object):
 
         return not self.requires_2sa
 
-    def _check_pcs(self):
-        x = self.session.post(
+    def _check_pcs(self) -> None:
+        resp = self.session.post(
             f"{self.setup_endpoint}/requestWebAccessState", params=self.params
         ).json()
 
-        self._pcs_enabled = isinstance(x["isDeviceConsentedForPCS"], bool)
-        self._pcs_access = x["isDeviceConsentedForPCS"] if self._pcs_enabled else True
-        self._icdrs_disabled = x["isICDRSDisabled"] or False
+        self._pcs_enabled = isinstance(resp["isDeviceConsentedForPCS"], bool)
+        self._pcs_access = (
+            resp["isDeviceConsentedForPCS"] if self._pcs_enabled else True
+        )
+        self._icdrs_disabled = resp.get("isICDRSDisabled", False)
 
-    def _request_pcs_for_service(self, app_name: str):
+    def _request_pcs_for_service(self, app_name: str) -> None:
+        def _send_pcs_request(derived_from_user_action: bool):
+            return self.session.post(
+                f"{self.setup_endpoint}/requestPCS",
+                json={
+                    "appName": app_name,
+                    "derivedFromUserAction": derived_from_user_action,
+                },
+                params=self.params,
+            ).json()
+
         self._check_pcs()
 
         if not self._icdrs_disabled:
@@ -479,39 +491,32 @@ class PyiCloudService(object):
             return
 
         if not self._pcs_access:
-            x = self.session.post(
-                f"{self.setup_endpoint}/requestPCS", params=self.params
+            resp = self.session.post(
+                f"{self.setup_endpoint}/enableDeviceConsentForPCS", params=self.params
             ).json()
-            if not x["isDeviceConsentNotificationSent"]:
+
+            if not resp.get("isDeviceConsentNotificationSent"):
                 raise PyiCloudAPIResponseException("Unable to request PCS access!")
 
         while not self._pcs_access:
-            time.sleep(5000)
+            time.sleep(5)
             self._check_pcs()
 
-        x = self.session.post(
-            f"{self.setup_endpoint}/requestPCS",
-            json={"appName": app_name, "derivedFromUserAction": True},
-            params=self.params,
-        ).json()
+        resp = _send_pcs_request(derived_from_user_action=True)
 
         while True:
-            if x["status"] == "success":
+            if resp["status"] == "success":
                 break
 
-            if x["message"] == "Requested the device to upload cookies.":
+            if resp["message"] == "Requested the device to upload cookies.":
                 pass
-            elif x["message"] == "Cookies not available yet on server.":
-                time.sleep(5000)
+            elif resp["message"] == "Cookies not available yet on server.":
+                time.sleep(5)
                 break
             else:
                 LOGGER.error("Unknown PCS state")
 
-        self.session.post(
-            f"{self.setup_endpoint}/requestPCS",
-            json={"appName": app_name, "derivedFromUserAction": False},
-            params=self.params,
-        )
+        _send_pcs_request(derived_from_user_action=False)
 
     def _get_webauthn_options(self) -> Dict:
         """Retrieve WebAuthn request options (PublicKeyCredentialRequestOptions) for assertion."""
