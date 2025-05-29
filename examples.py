@@ -54,8 +54,6 @@ def get_api() -> PyiCloudService:
     )
 
     if api.requires_2fa:
-        print("Two-factor authentication required.")
-
         security_key_names = api.security_key_names
 
         if security_key_names:
@@ -66,6 +64,7 @@ def get_api() -> PyiCloudService:
             api.confirm_security_key()
 
         else:
+            print("Two-factor authentication required.")
             code = input(
                 "Enter the code you received of one of your approved devices: "
             )
