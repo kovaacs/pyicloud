@@ -4,6 +4,7 @@ import base64
 import getpass
 import hashlib
 import logging
+import time
 from os import environ, mkdir, path
 from tempfile import gettempdir
 from typing import Any, Dict, List, Optional
@@ -461,6 +462,57 @@ class PyiCloudService(object):
 
         return not self.requires_2sa
 
+    def _check_pcs(self):
+        x = self.session.post(
+            f"{self.setup_endpoint}/requestWebAccessState", params=self.params
+        ).json()
+
+        self._pcs_enabled = isinstance(x["isDeviceConsentedForPCS"], bool)
+        self._pcs_access = x["isDeviceConsentedForPCS"] if self._pcs_enabled else True
+        self._icdrs_disabled = x["isICDRSDisabled"] or False
+
+    def _request_pcs_for_service(self, app_name: str):
+        self._check_pcs()
+
+        if not self._icdrs_disabled:
+            LOGGER.warning("ICDRS is not disabled")
+            return
+
+        if not self._pcs_access:
+            x = self.session.post(
+                f"{self.setup_endpoint}/requestPCS", params=self.params
+            ).json()
+            if not x["isDeviceConsentNotificationSent"]:
+                raise PyiCloudAPIResponseException("Unable to request PCS access!")
+
+        while not self._pcs_access:
+            time.sleep(5000)
+            self._check_pcs()
+
+        x = self.session.post(
+            f"{self.setup_endpoint}/requestPCS",
+            json={"appName": app_name, "derivedFromUserAction": True},
+            params=self.params,
+        ).json()
+
+        while True:
+            if x["status"] == "success":
+                break
+
+            if x["message"] == "Requested the device to upload cookies.":
+                pass
+            elif x["message"] == "Cookies not available yet on server.":
+                time.sleep(5000)
+                break
+            else:
+                LOGGER.error("Unknown PCS state")
+
+        self.session.post(
+            f"{self.setup_endpoint}/requestPCS",
+            json={"appName": app_name, "derivedFromUserAction": False},
+            params=self.params,
+        )
+
     def _get_webauthn_options(self) -> Dict:
         """Retrieve WebAuthn request options (PublicKeyCredentialRequestOptions) for assertion."""
         headers = self._get_auth_headers({"Accept": CONTENT_TYPE_JSON})
@@ -497,7 +549,7 @@ class PyiCloudService(object):
         def b64url_decode(s: str) -> bytes:
             return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
 
-        def b64url_encode(b: bytes) -> str:
+        def b64_encode(b: bytes) -> str:
             return base64.b64encode(b).decode()
 
         options = self._get_webauthn_options()
@@ -532,11 +584,11 @@ class PyiCloudService(object):
         self._submit_webauthn_assertion_response(
             {
                 "challenge": challenge,
-                "clientData": b64url_encode(response.client_data),
-                "signatureData": b64url_encode(response.signature),
-                "authenticatorData": b64url_encode(response.authenticator_data),
-                "userHandle": b64url_encode(response.user_handle),
-                "credentialID": b64url_encode(response.credential_id),
+                "clientData": b64_encode(response.client_data),
+                "signatureData": b64_encode(response.signature),
+                "authenticatorData": b64_encode(response.authenticator_data),
+                "userHandle": b64_encode(response.user_handle),
+                "credentialID": b64_encode(response.credential_id),
                 "rpId": rp_id,
             }
         )
