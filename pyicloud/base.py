@@ -537,11 +537,7 @@ class PyiCloudService(object):
 
     def validate_2fa_code(self, code: str) -> bool:
         """Verifies a verification code received via Apple's 2FA system (HSA2)."""
-        data: dict[str, Any] = {
-            "securityCode": {
-                "code": code,
-            },
-        }
+        data: dict[str, Any] = {"securityCode": {"code": code}}
 
         headers: dict[str, Any] = self._get_auth_headers({"Accept": CONTENT_TYPE_JSON})
 
