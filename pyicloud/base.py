@@ -508,15 +508,15 @@ class PyiCloudService(object):
             if resp["status"] == "success":
                 break
 
-            if resp["message"] == "Requested the device to upload cookies.":
-                pass
-            elif resp["message"] == "Cookies not available yet on server.":
+            if resp["message"] in (
+                "Requested the device to upload cookies.",
+                "Cookies not available yet on server.",
+            ):
                 time.sleep(5)
-                break
+                resp = _send_pcs_request(derived_from_user_action=False)
             else:
                 LOGGER.error("Unknown PCS state")
-
-        _send_pcs_request(derived_from_user_action=False)
+                break
 
     def _get_webauthn_options(self) -> Dict:
         """Retrieve WebAuthn request options (PublicKeyCredentialRequestOptions) for assertion."""
@@ -714,6 +714,8 @@ class PyiCloudService(object):
     @property
     def photos(self) -> PhotosService:
         """Gets the 'Photo' service."""
+        self._request_pcs_for_service("photos")
+
         if not self._photos:
             service_root: str = self.get_webservice_url("ckdatabasews")
             upload_url: str = self.get_webservice_url("uploadimagews")
@@ -782,6 +784,8 @@ class PyiCloudService(object):
     @property
     def drive(self) -> DriveService:
         """Gets the 'Drive' service."""
+        self._request_pcs_for_service("iclouddrive")
+
         if not self._drive:
             try:
                 self._drive = DriveService(
