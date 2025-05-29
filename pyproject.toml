@@ -108,4 +108,4 @@ packages = ["pyicloud", "pyicloud.services"]
 [tool.setuptools.dynamic]
 readme = {file = "README.md"}
 dependencies = {file = ["requirements.txt"]}
-optional-dependencies = {test = {file = ["requirements_test.txt"]}}
+optional-dependencies = {test = {file = ["requirements_test.txt"]}, adp = {file = ["requirements_adp.txt"]}}
