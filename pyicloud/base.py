@@ -464,6 +464,7 @@ class PyiCloudService(object):
     def _get_webauthn_options(self) -> Dict:
         """Retrieve WebAuthn request options (PublicKeyCredentialRequestOptions) for assertion."""
         headers = self._get_auth_headers({"Accept": CONTENT_TYPE_JSON})
+        LOGGER.debug("Getting the WebAuthn request options")
 
         return self.session.get(self.auth_endpoint, headers=headers).json()
 
@@ -475,6 +476,8 @@ class PyiCloudService(object):
     def _submit_webauthn_assertion_response(self, data: Dict) -> None:
         """Submit the WebAuthn assertion response for authentication."""
         headers = self._get_auth_headers({"Accept": CONTENT_TYPE_JSON})
+
+        LOGGER.debug("Submitting the WebAuthn assertion reponse")
 
         self.session.post(
             f"{self.auth_endpoint}/verify/security/key", json=data, headers=headers
@@ -501,10 +504,13 @@ class PyiCloudService(object):
         challenge = options["fsaChallenge"]["challenge"]
         allowed_credentials = options["fsaChallenge"]["keyHandles"]
         rp_id = options["fsaChallenge"]["rpId"]
+
+        LOGGER.debug("Initializing the FIDO2 device")
+
         devices = list(CtapHidDevice.list_devices())
 
         if not devices:
-            raise RuntimeError("No FIDO devices found")
+            raise RuntimeError("No FIDO2 devices found")
 
         client = Fido2Client(devices[0], "https://apple.com")
 
@@ -518,6 +524,8 @@ class PyiCloudService(object):
             rp_id=rp_id,
             allow_credentials=credentials,
         )
+
+        LOGGER.debug("Completing the WebAuthn assertion using the security key")
 
         response = client.get_assertion(assertion_options).get_response(0)
 
