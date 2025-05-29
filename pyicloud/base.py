@@ -472,13 +472,13 @@ class PyiCloudService(object):
         """Security key names which can be used for the WebAuthn assertion."""
         return self._get_webauthn_options().get("keyNames")
 
-    def _submit_webauthn_assertion_response(self, data: Dict):
+    def _submit_webauthn_assertion_response(self, data: Dict) -> None:
         """Submit the WebAuthn assertion response for authentication."""
         headers = self._get_auth_headers({"Accept": CONTENT_TYPE_JSON})
 
         self.session.post(
             f"{self.auth_endpoint}/verify/security/key", json=data, headers=headers
-        ).json()
+        )
 
     def confirm_security_key(self):
         """Conduct the WebAuthn assertion ceremony with user's FIDO2 device."""
@@ -519,8 +519,7 @@ class PyiCloudService(object):
             allow_credentials=credentials,
         )
 
-        assertions = client.get_assertion(assertion_options)
-        response = assertions.get_response(0)
+        response = client.get_assertion(assertion_options).get_response(0)
 
         self._submit_webauthn_assertion_response(
             {
