@@ -462,19 +462,19 @@ class PyiCloudService(object):
 
         return not self.requires_2sa
 
-    def _check_pcs(self) -> None:
+    def _check_pcs_consent(self) -> None:
+        LOGGER.debug("Querying web access state")
         resp = self.session.post(
             f"{self.setup_endpoint}/requestWebAccessState", params=self.params
         ).json()
 
-        self._pcs_enabled = isinstance(resp["isDeviceConsentedForPCS"], bool)
-        self._pcs_access = (
-            resp["isDeviceConsentedForPCS"] if self._pcs_enabled else True
-        )
+        self._pcs_consented = resp.get("isDeviceConsentedForPCS", True)
         self._icdrs_disabled = resp.get("isICDRSDisabled", False)
 
     def _request_pcs_for_service(self, app_name: str) -> None:
         def _send_pcs_request(derived_from_user_action: bool):
+            LOGGER.debug("Querying PCS status")
+
             return self.session.post(
                 f"{self.setup_endpoint}/requestPCS",
                 json={
@@ -484,13 +484,15 @@ class PyiCloudService(object):
                 params=self.params,
             ).json()
 
-        self._check_pcs()
+        self._check_pcs_consent()
 
         if not self._icdrs_disabled:
             LOGGER.warning("ICDRS is not disabled")
             return
 
-        if not self._pcs_access:
+        if not self._pcs_consented:
+            LOGGER.debug("Requesting PCS consent")
+
             resp = self.session.post(
                 f"{self.setup_endpoint}/enableDeviceConsentForPCS", params=self.params
             ).json()
@@ -498,24 +500,26 @@ class PyiCloudService(object):
             if not resp.get("isDeviceConsentNotificationSent"):
                 raise PyiCloudAPIResponseException("Unable to request PCS access!")
 
-        while not self._pcs_access:
+        while not self._pcs_consented:
             time.sleep(5)
-            self._check_pcs()
+            self._check_pcs_consent()
 
         resp = _send_pcs_request(derived_from_user_action=True)
 
         while True:
             if resp["status"] == "success":
+                LOGGER.debug("PCS access was granted")
                 break
 
             if resp["message"] in (
                 "Requested the device to upload cookies.",
                 "Cookies not available yet on server.",
             ):
+                LOGGER.debug("PCS access couldn't be obtained: %s", resp["message"])
                 time.sleep(5)
                 resp = _send_pcs_request(derived_from_user_action=False)
             else:
-                LOGGER.error("Unknown PCS state")
+                LOGGER.error("Unknown PCS state: %s", resp["message"])
                 break
 
     def _get_webauthn_options(self) -> Dict:
@@ -534,7 +538,7 @@ class PyiCloudService(object):
         """Submit the WebAuthn assertion response for authentication."""
         headers = self._get_auth_headers({"Accept": CONTENT_TYPE_JSON})
 
-        LOGGER.debug("Submitting the WebAuthn assertion reponse")
+        LOGGER.debug("Submitting the WebAuthn assertion response")
 
         self.session.post(
             f"{self.auth_endpoint}/verify/security/key", json=data, headers=headers
