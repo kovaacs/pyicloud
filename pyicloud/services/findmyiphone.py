@@ -1,6 +1,5 @@
 """Find my iPhone service."""
 
-import json
 from typing import Any, Iterator, Optional
 
 from requests import Response
@@ -45,17 +44,15 @@ class FindMyiPhoneServiceManager(BaseService):
         req: Response = self.session.post(
             self._fmip_refresh_url,
             params=self.params,
-            data=json.dumps(
-                {
-                    "clientContext": {
-                        "appName": "iCloud Find (Web)",
-                        "appVersion": "2.0",
-                        "apiVersion": "3.0",
-                        "deviceListVersion": 1,
-                        "fmly": self.with_family,
-                    }
+            json={
+                "clientContext": {
+                    "appName": "iCloud Find (Web)",
+                    "appVersion": "2.0",
+                    "apiVersion": "3.0",
+                    "deviceListVersion": 1,
+                    "fmly": self.with_family,
                 }
-            ),
+            },
         )
         self.response: dict[str, Any] = req.json()
 
@@ -157,14 +154,15 @@ class AppleDevice:
 
         It's possible to pass a custom message by changing the `subject`.
         """
-        data: str = json.dumps(
-            {
+        self.session.post(
+            self.sound_url,
+            params=self.params,
+            json={
                 "device": self.content["id"],
                 "subject": subject,
                 "clientContext": {"fmly": True},
-            }
+            },
         )
-        self.session.post(self.sound_url, params=self.params, data=data)
 
     def display_message(
         self, subject="Find My iPhone Alert", message="This is a note", sounds=False
@@ -173,16 +171,17 @@ class AppleDevice:
 
         It's possible to pass a custom message by changing the `subject`.
         """
-        data: str = json.dumps(
-            {
+        self.session.post(
+            self.message_url,
+            params=self.params,
+            json={
                 "device": self.content["id"],
                 "subject": subject,
                 "sound": sounds,
                 "userText": True,
                 "text": message,
-            }
+            },
         )
-        self.session.post(self.message_url, params=self.params, data=data)
 
     def lost_device(
         self, number, text="This iPhone has been lost. Please call me.", newpasscode=""
@@ -193,8 +192,10 @@ class AppleDevice:
         been passed, then the person holding the device can call
         the number without entering the passcode.
         """
-        data: str = json.dumps(
-            {
+        self.session.post(
+            self.lost_url,
+            params=self.params,
+            json={
                 "text": text,
                 "userText": True,
                 "ownerNbr": number,
@@ -202,9 +203,8 @@ class AppleDevice:
                 "trackingEnabled": True,
                 "device": self.content["id"],
                 "passcode": newpasscode,
-            }
+            },
         )
-        self.session.post(self.lost_url, params=self.params, data=data)
 
     @property
     def data(self) -> dict[str, Any]:
